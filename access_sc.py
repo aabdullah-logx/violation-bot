@@ -78,19 +78,30 @@ def load_web_driver_with_gologin(profile_id):
     )
     print("Driver created successfully")
 
-    driver.refresh()
-    # Close any extra windows to maintain only one active tab
+    handles = driver.window_handles
+
     try:
-        handles = driver.window_handles
+        # 1. Refresh ALL opened windows/tabs
+        for handle in handles:
+            driver.switch_to.window(handle)
+            driver.refresh()
+            print(f"Refreshed tab: {handle}")
+
+        # 2. Close extra windows to maintain only the first one
         if len(handles) > 1:
             main_window = handles[0]
+            # Iterate through handles starting from the second one
             for handle in handles[1:]:
                 driver.switch_to.window(handle)
                 driver.close()
+                print(f"Closed extra tab: {handle}")
+
+            # Switch back to the primary window
             driver.switch_to.window(main_window)
+
     except Exception as e:
-        print(f"Could not close extra tabs: {e}")
-        
+        print(f"Error during tab management: {e}")
+
     return driver
 
 
