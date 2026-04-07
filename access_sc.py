@@ -77,30 +77,32 @@ def load_web_driver_with_gologin(profile_id):
         options=chrome_options
     )
     print("Driver created successfully")
+    time.sleep(2)  # Give the browser a moment to fully stabilize
     driver.maximize_window()
-    handles = driver.window_handles
 
     try:
-        # 1. Refresh ALL opened windows/tabs
-        for handle in handles:
-            driver.switch_to.window(handle)
-            driver.refresh()
-            print(f"Refreshed tab: {handle}")
+        handles = driver.window_handles
+        active_tab = driver.current_window_handle
 
-        # 2. Close extra windows to maintain only the first one
         if len(handles) > 1:
-            main_window = handles[0]
-            # Iterate through handles starting from the second one
-            for handle in handles[1:]:
-                driver.switch_to.window(handle)
-                driver.close()
-                print(f"Closed extra tab: {handle}")
+            # Find a tab that is NOT the active one to switch to later
+            other_tab = [h for h in handles if h != active_tab][0]
 
-            # Switch back to the primary window
-            driver.switch_to.window(main_window)
+            print(f"Closing active tab: {active_tab}")
+            driver.close()  # Closes the tab the driver is currently focused on
+
+            # CRITICAL: You must switch to the other tab immediately
+            # or the next command will throw an 'Invalid Session ID' error.
+            driver.switch_to.window(other_tab)
+            driver.execute_script("window.focus();")
+            print("Focus shifted to the secondary tab.")
+
+        else:
+            print("Only one tab present. Refreshing instead of closing.")
+            driver.refresh()
 
     except Exception as e:
-        print(f"Error during tab management: {e}")
+        print(f"Error during active tab management: {e}")
 
     return driver
 
