@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Authentication ---
-TOKEN = os.getenv("TOKEN")
+token = os.getenv("TOKEN")
 
 # --- Configuration Flags ---
 # Convert string "False" or "True" to actual Boolean types
