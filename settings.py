@@ -14,7 +14,7 @@ LOCAL = os.getenv("LOCAL", "False").lower() == "true"
 LOCAL_DB = os.getenv("LOCAL_DB", "False").lower() == "true"
 
 # --- URL Constants ---
-BASE_URL = os.getenv("BASE_URL", "https://sellercentral.amazon.com")
+base_url = os.getenv("BASE_URL", "https://sellercentral.amazon.com")
 AMAZON_HOME = os.getenv("AMAZON_HOME")
 A_Z_CLAIMS_PATH = os.getenv("A_Z_CLAIMS")
 
