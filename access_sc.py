@@ -63,53 +63,33 @@ def load_web_driver_with_gologin(profile_id):
     # Connect Selenium to the GoLogin-managed browser
     chrome_options = Options()
     chrome_options.add_experimental_option("debuggerAddress", debugger_address)
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--remote-debugging-port=9222")  # Essential for GoLogin
 
-    try:
-        # Pick the correct chromedriver for the current OS
-        if platform == "linux" or platform == "linux2":
-            chrome_driver_path = "./chromedriver"
-        elif platform == "darwin":
-            chrome_driver_path = "./mac/chromedriver"
-        elif platform == "win32":
-            chrome_driver_path = "chromedriver.exe"
-        print("ChromeDriver")
-    except Exception as e:
-        print(e)
+    # Pick the correct chromedriver for the current OS
+    if platform == "linux" or platform == "linux2":
+        chrome_driver_path = "./chromedriver"
+    elif platform == "darwin":
+        chrome_driver_path = "./mac/chromedriver"
+    elif platform == "win32":
+        chrome_driver_path = "chromedriver.exe"
 
-    try:
-        driver = webdriver.Chrome(executable_path=chrome_driver_path, options=chrome_options)
-        driver = webdriver.Chrome(
-            service=Service(chrome_driver_path),
-            options=chrome_options
-        )
-    except Exception as e:
-        print("Chrome driver not found", e)
+    driver = webdriver.Chrome(
+        service=Service(chrome_driver_path),
+        options=chrome_options
+    )
     print("Driver created successfully")
-    time.sleep(2)  # Give the browser a moment to fully stabilize
-    driver.maximize_window()
 
+    # driver.refresh()
+    # Close any extra windows to maintain only one active tab
     try:
         handles = driver.window_handles
-        active_tab = driver.current_window_handle
-
-
-        driver.close()  # Closes the tab the driver is currently focused on
-        time.sleep(2)
-            # CRITICAL: You must switch to the other tab immediately
-            # or the next command will throw an 'Invalid Session ID' error.
-        # driver.switch_to.window(other_tab)
-        driver.execute_script("window.focus();")
-        print("Focus shifted to the secondary tab.")
-
-
-        driver.refresh()
-
+        if len(handles) > 1:
+            main_window = handles[0]
+            for handle in handles[1:]:
+                driver.switch_to.window(handle)
+                driver.close()
+            driver.switch_to.window(main_window)
     except Exception as e:
-        print(f"Error during active tab management: {e}")
+        print(f"Could not close extra tabs: {e}")
 
     return driver
 
