@@ -21,7 +21,7 @@ A_Z_CLAIMS_PATH = os.getenv("A_Z_CLAIMS")
 # --- Policy Violations Dictionary ---
 # We parse the string from .env back into a Python dictionary
 raw_paths = os.getenv("POLICY_VIOLATION_PATHS", "{}")
-POLICY_VIOLATION_URLS = json.loads(raw_paths)
+policy_violation_url_list = json.loads(raw_paths)
 
 def get_full_url(path_key):
     """Utility to combine base URL with a specific policy path."""
