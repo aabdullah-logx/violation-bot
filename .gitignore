@@ -1,0 +1,101 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+gologin_temp
+client_secret.json
+concise-faculty-419809-256ea1c757da.json
+white-resolver-420607-f75f9bef53d2.json
+drive_oauth2.dat
+sheets_oauth2.dat
+app-api-ful-feb-17-2023.pem
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Environment variables
+.env
+.env.*
+
+# Logs
+*.log
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# SQLite database
+*.sqlite3
+db.sqlite3
+
+# PyInstaller
+*.manifest
+*.spec
+
+# mypy / type checker
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff / linting
+.ruff_cache/
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# secrets
+*.pem
+*.key
+
+# Temporary files
+*.tmp
+*.bak
+
+
+local_data.db
+data.txt
+24-july-25.zip
+git remote add origin git@github-logx:aabdullah-logx/violation-bot.git
