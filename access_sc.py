@@ -77,7 +77,7 @@ def load_web_driver_with_gologin(profile_id):
         options=chrome_options
     )
     print("Driver created successfully")
-
+    
     # Close any extra windows to maintain only one active tab
     try:
         handles = driver.window_handles
@@ -89,7 +89,7 @@ def load_web_driver_with_gologin(profile_id):
             driver.switch_to.window(main_window)
     except Exception as e:
         print(f"Could not close extra tabs: {e}")
-
+        
     return driver
 
 
