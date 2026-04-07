@@ -77,7 +77,7 @@ def load_web_driver_with_gologin(profile_id):
         options=chrome_options
     )
     print("Driver created successfully")
-
+    driver.maximize_window()
     handles = driver.window_handles
 
     try:
