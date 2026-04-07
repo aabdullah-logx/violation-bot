@@ -63,19 +63,31 @@ def load_web_driver_with_gologin(profile_id):
     # Connect Selenium to the GoLogin-managed browser
     chrome_options = Options()
     chrome_options.add_experimental_option("debuggerAddress", debugger_address)
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--remote-debugging-port=9222")  # Essential for GoLogin
 
-    # Pick the correct chromedriver for the current OS
-    if platform == "linux" or platform == "linux2":
-        chrome_driver_path = "./chromedriver"
-    elif platform == "darwin":
-        chrome_driver_path = "./mac/chromedriver"
-    elif platform == "win32":
-        chrome_driver_path = "chromedriver.exe"
+    try:
+        # Pick the correct chromedriver for the current OS
+        if platform == "linux" or platform == "linux2":
+            chrome_driver_path = "./chromedriver"
+        elif platform == "darwin":
+            chrome_driver_path = "./mac/chromedriver"
+        elif platform == "win32":
+            chrome_driver_path = "chromedriver.exe"
+        print("ChromeDriver")
+    except Exception as e:
+        print(e)
 
-    driver = webdriver.Chrome(
-        service=Service(chrome_driver_path),
-        options=chrome_options
-    )
+    try:
+        driver = webdriver.Chrome(executable_path=chrome_driver_path, options=chrome_options)
+        driver = webdriver.Chrome(
+            service=Service(chrome_driver_path),
+            options=chrome_options
+        )
+    except Exception as e:
+        print("Chrome driver not found", e)
     print("Driver created successfully")
     time.sleep(2)  # Give the browser a moment to fully stabilize
     driver.maximize_window()
