@@ -84,22 +84,17 @@ def load_web_driver_with_gologin(profile_id):
         handles = driver.window_handles
         active_tab = driver.current_window_handle
 
-        if len(handles) > 1:
-            # Find a tab that is NOT the active one to switch to later
-            other_tab = [h for h in handles if h != active_tab][0]
 
-            print(f"Closing active tab: {active_tab}")
-            driver.close()  # Closes the tab the driver is currently focused on
-
+        driver.close()  # Closes the tab the driver is currently focused on
+        time.sleep(2)
             # CRITICAL: You must switch to the other tab immediately
             # or the next command will throw an 'Invalid Session ID' error.
-            driver.switch_to.window(other_tab)
-            driver.execute_script("window.focus();")
-            print("Focus shifted to the secondary tab.")
+        # driver.switch_to.window(other_tab)
+        driver.execute_script("window.focus();")
+        print("Focus shifted to the secondary tab.")
 
-        else:
-            print("Only one tab present. Refreshing instead of closing.")
-            driver.refresh()
+
+        driver.refresh()
 
     except Exception as e:
         print(f"Error during active tab management: {e}")
