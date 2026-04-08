@@ -85,6 +85,7 @@ def load_web_driver_with_gologin(profile_id):
     elif platform == "win32":
         chrome_driver_path = "chromedriver.exe"
 
+    print("Driver loaded")
     driver = webdriver.Chrome(
         service=Service(chrome_driver_path),
         options=chrome_options
