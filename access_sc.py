@@ -58,11 +58,24 @@ def load_web_driver_with_gologin(profile_id):
 
     # Start GoLogin and capture the debugger address it returns
     debugger_address = gl.start()
+    time.sleep(5)
     print(f'Debugger address: {debugger_address}')
 
     # Connect Selenium to the GoLogin-managed browser
     chrome_options = Options()
     chrome_options.add_experimental_option("debuggerAddress", debugger_address)
+    chrome_options.add_argument("--disable-background-timer-throttling")
+    chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+    chrome_options.add_argument("--disable-renderer-backgrounding")
+    chrome_options.add_argument("--disable-background-networking")
+
+    # Also add these for RDP stability
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-position=0,0")
+    chrome_options.add_argument("--window-size=1280,800")
+    chrome_options.add_argument("--force-device-scale-factor=1")
 
     # Pick the correct chromedriver for the current OS
     if platform == "linux" or platform == "linux2":
@@ -77,7 +90,10 @@ def load_web_driver_with_gologin(profile_id):
         options=chrome_options
     )
     print("Driver created successfully")
-    
+
+    driver.set_window_position(0, 0)
+    driver.set_window_size(1280, 800)
+    driver.maximize_window()
     # Close any extra windows to maintain only one active tab
     try:
         handles = driver.window_handles
