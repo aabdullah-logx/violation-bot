@@ -79,21 +79,11 @@ def load_web_driver_with_gologin(profile_id):
     host, port = debugger_address.split(":")
     wait_for_port(host, int(port), timeout=30)
 
-
     time.sleep(5)
-
 
     # Connect Selenium to the GoLogin-managed browser
     chrome_options = Options()
-    chrome_options.add_argument("--disable-background-timer-throttling")
-    chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-    chrome_options.add_argument("--disable-renderer-backgrounding")
-    chrome_options.add_argument("--no-first-run")
-    chrome_options.add_argument("--no-default-browser-check")
-    chrome_options.add_argument("--disable-default-apps")
-    chrome_options.add_argument("--disable-popup-blocking")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_experimental_option("debuggerAddress", debugger_address)
 
     # Pick the correct chromedriver for the current OS
     if platform == "linux" or platform == "linux2":
@@ -440,13 +430,13 @@ def insert_into_quickbase_x(data_list, violations_list=None):
         prepared = []
         for v in violations_list:
             # Format publish_time correctly for QuickBase date field
-            publish_time = v.get('publish_time')
-            if publish_time and isinstance(publish_time, datetime):
-                date_value = publish_time.strftime('%Y-%m-%dT%H:%M:%SZ')
-            elif publish_time:
-                date_value = str(publish_time)
-            else:
-                date_value = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+            # publish_time = v.get('publish_time')
+            # if publish_time and isinstance(publish_time, datetime):
+            #     date_value = publish_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+            # elif publish_time:
+            #     date_value = str(publish_time)
+            # else:
+            date_value = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
 
             prepared.append({
                 '6':  {'value': date_value},                   # Update Date
