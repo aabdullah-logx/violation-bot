@@ -2,7 +2,6 @@ import stores
 import get_totp
 import access_sc
 import time
-import schedule
 import os
 import shutil
 from datetime import datetime, timedelta
@@ -121,6 +120,7 @@ def run():
                 store['qr_key'] = qr_key
 
             # ── Launch browser & run automation ──────────────────────────
+            store_success = False
             try:
                 profile_id = store['profile_id']
                 print(f'Processing-----------: {storename}')
@@ -144,6 +144,7 @@ def run():
                                 start_date=start_date,
                                 today=False
                             )
+                            store_success = True
                         except Exception as e:
                             print(f'Error Policy Violation: {e}')
 
@@ -155,70 +156,36 @@ def run():
             except Exception as e:
                 print(f'Error - Store "{storename}": {e}')
 
+            # ── Update remark column in Google Sheet (cloud mode only) ────
+            if not getattr(settings, 'LOCAL', False):
+                try:
+                    remark_col = df.columns.get_loc('remark') + 1
+                    remark_text = "Completed" if store_success else "Failed"
+                    store_sheet.update_cell(index + 2, remark_col, remark_text)
+                    print(f'[REMARK] {storename}: {remark_text}')
+                except Exception as e:
+                    print(f'[REMARK] Failed to update remark for {storename}: {e}')
+
     except Exception as e:
         print(f'Fatal Error: {e}')
 
 
-def schedule_next_run(previous_start_time):
-    # Determine the time for the next run based on the previous start time plus 12 hours.
-    next_run_time = previous_start_time + timedelta(hours=12)
-
-    # If more than 12 hours have elapsed since the last start time, start immediately.
-    if datetime.now() >= next_run_time:
-        print("More than 12 hours have elapsed since the last run. Starting immediately.")
-        next_run_time = datetime.now()
-
-    # Schedule the next run.
-    schedule.clear()  # Clear existing scheduled jobs.
-    print(f"Next run scheduled at: {next_run_time}")
-    schedule.every().day.at(next_run_time.strftime('%H:%M')).do(run_and_schedule)
-
-
-def run_and_schedule():
-    global last_start_time
-
-    # Record the start time of this run.
-    last_start_time = datetime.now()
-
-    # Execute the main function.
-    run()
-
-    # Schedule the next run based on the current start time.
-    schedule_next_run(last_start_time)
-
-
 def main():
-    global last_start_time
-    last_start_time = datetime.now()
-
-    # Start the first iteration immediately.
-    run_and_schedule()
-
-    # Continuously check for scheduled tasks and execute them.
     while True:
-        schedule.run_pending()
-        time.sleep(1)
+        print(f"\n{'='*60}")
+        print(f"Starting store processing at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"{'='*60}\n")
 
+        run()
 
-# def schedule_start_tomorrow():
-#     # Calculate tomorrow's date
-#     tomorrow = datetime.now() + timedelta(days=1)
-#     start_time = "00:00"
+        wait_hours = 12
+        next_run_time = datetime.now() + timedelta(hours=wait_hours)
+        print(f"\n{'='*60}")
+        print(f"All stores completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Waiting {wait_hours} hours. Next run at: {next_run_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"{'='*60}\n")
 
-#     print(f"Scheduled to start at: {tomorrow.strftime('%Y-%m-%d')} {start_time}")
-
-#     # Schedule the 'run' function to start at the specified time from tomorrow
-#     schedule.every().day.at(start_time).do(run)
-
-
-# def main():
-#     run()
-
-#     schedule_start_tomorrow()
-
-#     while True:
-#         schedule.run_pending()
-#         time.sleep(1)
+        time.sleep(wait_hours * 3600)
 
 
 if __name__ == '__main__':

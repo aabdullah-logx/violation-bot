@@ -432,16 +432,49 @@ def insert_into_quickbase_x(data_list, violations_list=None):
 
     # ── Violations ──────────────────────────────────────────────
     if violations_list:
-        prepared = []
+        # ── Duplicate check: query QuickBase for existing storename+ASIN ──
+        new_violations = []
+        skipped_count = 0
         for v in violations_list:
-            # Format publish_time correctly for QuickBase date field
-            # publish_time = v.get('publish_time')
-            # if publish_time and isinstance(publish_time, datetime):
-            #     date_value = publish_time.strftime('%Y-%m-%dT%H:%M:%SZ')
-            # elif publish_time:
-            #     date_value = str(publish_time)
-            # else:
+            v_store = v.get('storename', '')
+            v_asin  = v.get('asin', '')
+            if v_store and v_asin:
+                try:
+                    query_body = {
+                        "from": "buab36fis",
+                        "select": [3],
+                        "where": f"{{'7'.EX.'{v_store}'}}AND{{'8'.EX.'{v_asin}'}}"
+                    }
+                    qr = requests.post(
+                        "https://api.quickbase.com/v1/records/query",
+                        headers=headers, json=query_body
+                    )
+                    existing = qr.json().get('data', [])
+                    if existing:
+                        print(f"  [QB] Skipping existing violation: {v_store} / {v_asin}")
+                        skipped_count += 1
+                        continue
+                except Exception as e:
+                    print(f"  [QB] Duplicate-check failed for {v_asin}, will insert anyway: {e}")
+            new_violations.append(v)
+
+        print(f"  [QB] Violations: {len(new_violations)} new, {skipped_count} skipped (already exist)")
+
+        if not new_violations:
+            print("  [QB] No new violations to insert.")
+            return
+
+        prepared = []
+        for v in new_violations:
             date_value = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+
+            # Format S.C Date for QuickBase
+            sc_date = ''
+            if v.get('publish_time'):
+                try:
+                    sc_date = v['publish_time'].strftime('%Y-%m-%dT%H:%M:%SZ')
+                except Exception:
+                    sc_date = str(v['publish_time'])
 
             prepared.append({
                 '6':  {'value': date_value},                   # Update Date
@@ -452,6 +485,7 @@ def insert_into_quickbase_x(data_list, violations_list=None):
                 '11': {'value': v.get('reason', '')},          # Sub_Reason
                 '12': {'value': ''},                           # Product Category
                 '13': {'value': v.get('impact', '')},          # Health Impact
+                '14': {'value': sc_date},                      # S.C Date
             })
         try:
             r = requests.post(url, headers=headers, json={
@@ -869,16 +903,21 @@ def get_violations(driver, store, start_date, today=False):
                         // If still no ASIN, skip
                         if (!asin) { skipped++; continue; }
 
-                        // Extract Date using regex on text content
+                        // Extract Date — prefer the specific data-testid element
                         var dateStr = '';
-                        // Usually like "Apr 3, 2026" or "Apr. 3, 2026"
-                        var dateMatch = cardText.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},\s+20\d{2}/i);
-                        if (dateMatch) {
-                            dateStr = dateMatch[0].trim();
-                        } else {
-                            // Try DD MMM YYYY
-                            var dateMatch2 = cardText.match(/\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+20\d{2}/i);
-                            if (dateMatch2) dateStr = dateMatch2[0].trim();
+                        var dateEl = card.querySelector('div[data-testid^="ahd-ppc-row-date-"]');
+                        if (dateEl && dateEl.textContent.trim()) {
+                            dateStr = dateEl.textContent.trim();
+                        }
+                        // Fallback: regex on text content
+                        if (!dateStr) {
+                            var dateMatch = cardText.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},\s+20\d{2}/i);
+                            if (dateMatch) {
+                                dateStr = dateMatch[0].trim();
+                            } else {
+                                var dateMatch2 = cardText.match(/\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+20\d{2}/i);
+                                if (dateMatch2) dateStr = dateMatch2[0].trim();
+                            }
                         }
 
                         // Extract Reason, Action Taken, Health Impact
