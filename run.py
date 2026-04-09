@@ -21,24 +21,27 @@ if getattr(settings, 'LOCAL_DB', False):
 
 
 def clear_temp_directory(path):
-    for root, dirs, files in os.walk(path, topdown=False):
-        # Remove files
-        for name in files:
-            file_path = os.path.join(root, name)
-            try:
-                os.remove(file_path)
-            except Exception as e:
+    try:
+        for root, dirs, files in os.walk(path, topdown=False):
+            # Remove files
+            for name in files:
+                file_path = os.path.join(root, name)
+                try:
+                    os.remove(file_path)
+                except Exception as e:
 
-                print(f"Failed to delete {file_path}: {e}")
+                    print(f"Failed to delete {file_path}: {e}")
 
-        # Remove directories
-        for name in dirs:
-            dir_path = os.path.join(root, name)
-            try:
-                shutil.rmtree(dir_path)
-            except Exception as e:
-                # pass
-                print(f"Failed to delete {dir_path}: {e}")
+            # Remove directories
+            for name in dirs:
+                dir_path = os.path.join(root, name)
+                try:
+                    shutil.rmtree(dir_path)
+                except Exception as e:
+                    # pass
+                    print(f"Failed to delete {dir_path}: {e}")
+    except Exception as e:
+        pass
 
 
 def run():

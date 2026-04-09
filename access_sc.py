@@ -184,14 +184,19 @@ def sign_in_if_needed(driver, profile, gc_store, df, index):
         time.sleep(10)
 
         # Step 3: Enter password
-        password_input = WebDriverWait(driver, 10).until(
+        password_input = WebDriverWait(driver, 7).until(
             EC.presence_of_element_located((By.ID, "ap_password"))
         )
-        time.sleep(2)
+        time.sleep(1)
 
         password_input.clear()
-        time.sleep(2)
+        time.sleep(1)
         password_input.send_keys(profile['pass'])
+        time.sleep(1)
+        password_input.clear()
+        time.sleep(1)
+        password_input.send_keys(profile['pass'])
+        time.sleep(1)
         driver.find_element(By.ID, 'signInSubmit').click()
         # if password_input.text:
         #     password_input.clear()
@@ -212,7 +217,7 @@ def sign_in_if_needed(driver, profile, gc_store, df, index):
         except:
             pass
 
-        time.sleep(10)
+        time.sleep(7)
 
         # Step 4: OTP / Two-Step Verification
         try:
