@@ -469,13 +469,12 @@ def insert_into_quickbase_x(data_list, violations_list=None):
 
             # Format S.C Date for QuickBase
             # Format S.C Date for QuickBase
-            sc_date = ''
-            publish_time = v.get('publish_time')
-
+            publish_time = v.get('publish_time')  # already a datetime object from parse_violation_date
             if isinstance(publish_time, datetime):
-                sc_date = publish_time.strftime('%Y-%m-%d %H:%M:%S')  # "2025-12-15 00:00:00"
-            elif isinstance(publish_time, str) and publish_time:
-                sc_date = publish_time[:19]  #  trims to "2025-12-15 00:00:00"
+                sc_date = publish_time.strftime('%Y-%m-%d')  #  "2026-02-18" — what QB Date field expects
+            else:
+                sc_date = ''
+
             print(f"  [QB] ASIN: {v.get('asin', '')} | S.C Date: {sc_date} | publish_time raw: {publish_time}")
 
             prepared.append({
