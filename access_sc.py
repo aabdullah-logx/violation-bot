@@ -468,10 +468,15 @@ def insert_into_quickbase_x(data_list, violations_list=None):
             date_value = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
 
             # Format S.C Date for QuickBase
+            # Format S.C Date for QuickBase
             sc_date = ''
             publish_time = v.get('publish_time')
-
-            sc_date = publish_time[:10]
+            if publish_time:
+                # If it's a datetime object, format it correctly. Otherwise, treat it as a string
+                if hasattr(publish_time, 'strftime'):
+                    sc_date = publish_time.strftime('%Y-%m-%d')
+                else:
+                    sc_date = str(publish_time)[:10]
 
             print(f"  [QB] ASIN: {v.get('asin', '')} | S.C Date: {sc_date} | publish_time raw: {publish_time}")
 
