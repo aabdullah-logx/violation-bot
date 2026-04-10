@@ -469,11 +469,17 @@ def insert_into_quickbase_x(data_list, violations_list=None):
 
             # Format S.C Date for QuickBase
             # Format S.C Date for QuickBase
-            publish_time = v.get('publish_time')  # already a datetime object from parse_violation_date
-            if isinstance(publish_time, datetime):
-                sc_date = publish_time.strftime('%Y-%m-%d')  #  "2026-02-18" — what QB Date field expects
-            else:
-                sc_date = ''
+            sc_date = ''
+            publish_time = v.get('publish_time')
+
+            if publish_time:
+                # Format to MMDDYYYY because Quickbase evaluates ToDate([S.C Date], "MMDDYYYY")
+                if hasattr(publish_time, 'strftime'):
+                    sc_date = publish_time.strftime('%m%d%Y')
+                else:
+                    # If it happens to be string, we can't reliably format it
+                    # but we keep it safe.
+                    sc_date = str(publish_time)[:10]
 
             print(f"  [QB] ASIN: {v.get('asin', '')} | S.C Date: {sc_date} | publish_time raw: {publish_time}")
 
@@ -486,7 +492,7 @@ def insert_into_quickbase_x(data_list, violations_list=None):
                 '11': {'value': v.get('reason', '')},
                 '12': {'value': ''},
                 '13': {'value': v.get('impact', '')},
-                '14': {'value': sc_date},
+                '15': {'value': sc_date},
             })
         try:
             r = requests.post(url, headers=headers, json={
