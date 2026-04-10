@@ -443,7 +443,7 @@ def insert_into_quickbase_x(data_list, violations_list=None):
                 sc_date = publish_time.strftime('%Y-%m-%dT%H:%M:%SZ')
             elif publish_time:
                 sc_date = str(publish_time)
-
+            print("sc_date: ", sc_date)
             prepared.append({
                 '6':  {'value': date_value},                   # Update Date
                 '7':  {'value': v.get('storename', '')},       # Store
