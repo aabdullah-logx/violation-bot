@@ -468,15 +468,10 @@ def insert_into_quickbase_x(data_list, violations_list=None):
             date_value = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
 
             # Format S.C Date for QuickBase
-            # Format S.C Date for QuickBase
             sc_date = ''
             publish_time = v.get('publish_time')
-            if publish_time:
-                # If it's a datetime object, format it correctly. Otherwise, treat it as a string
-                if hasattr(publish_time, 'strftime'):
-                    sc_date = publish_time.strftime('%Y-%m-%d')
-                else:
-                    sc_date = str(publish_time)[:10]
+
+            # sc_date = publish_time[:10]
 
             print(f"  [QB] ASIN: {v.get('asin', '')} | S.C Date: {sc_date} | publish_time raw: {publish_time}")
 
@@ -489,7 +484,7 @@ def insert_into_quickbase_x(data_list, violations_list=None):
                 '11': {'value': v.get('reason', '')},          # Sub_Reason
                 '12': {'value': ''},                           # Product Category
                 '13': {'value': v.get('impact', '')},          # Health Impact
-                '14': {'value': sc_date},                      # S.C Date
+                '14': {'value': publish_time},                      # S.C Date
             })
         try:
             r = requests.post(url, headers=headers, json={
