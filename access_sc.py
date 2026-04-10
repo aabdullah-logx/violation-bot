@@ -468,23 +468,27 @@ def insert_into_quickbase_x(data_list, violations_list=None):
             date_value = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
 
             # Format S.C Date for QuickBase
+            # Format S.C Date for QuickBase
             sc_date = ''
             publish_time = v.get('publish_time')
 
-            # sc_date = publish_time[:10]
+            if isinstance(publish_time, datetime):
+                sc_date = publish_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+            elif isinstance(publish_time, str) and publish_time:
+                sc_date = publish_time[:19].replace(' ', 'T') + 'Z'  # normalize string format
 
             print(f"  [QB] ASIN: {v.get('asin', '')} | S.C Date: {sc_date} | publish_time raw: {publish_time}")
 
             prepared.append({
-                '6':  {'value': date_value},                   # Update Date
-                '7':  {'value': v.get('storename', '')},       # Store
-                '8':  {'value': v.get('asin', '')},            # ASIN
-                '9':  {'value': ''},                           # Brand
-                '10': {'value': v.get('category', '')},        # Reason
-                '11': {'value': v.get('reason', '')},          # Sub_Reason
-                '12': {'value': ''},                           # Product Category
-                '13': {'value': v.get('impact', '')},          # Health Impact
-                '14': {'value': publish_time},                      # S.C Date
+                '6': {'value': date_value},
+                '7': {'value': v.get('storename', '')},
+                '8': {'value': v.get('asin', '')},
+                '9': {'value': ''},
+                '10': {'value': v.get('category', '')},
+                '11': {'value': v.get('reason', '')},
+                '12': {'value': ''},
+                '13': {'value': v.get('impact', '')},
+                '14': {'value': sc_date},
             })
         try:
             r = requests.post(url, headers=headers, json={
