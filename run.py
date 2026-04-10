@@ -121,6 +121,18 @@ def run():
 
             # ── Launch browser & run automation ──────────────────────────
             store_success = False
+
+            # ── Update Violation Status: Last Run timestamp (cloud only) ──
+            if not getattr(settings, 'LOCAL', False):
+                try:
+                    if 'Violation Status' in df.columns:
+                        vs_col = df.columns.get_loc('Violation Status') + 1
+                        run_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        store_sheet.update_cell(index + 2, vs_col, f"Last Run: {run_time}")
+                        print(f'[STATUS] {storename}: Violation Status → Last Run: {run_time}')
+                except Exception as e:
+                    print(f'[STATUS] Failed to update Violation Status for {storename}: {e}')
+
             try:
                 profile_id = store['profile_id']
                 print(f'Processing-----------: {storename}')
@@ -165,6 +177,17 @@ def run():
                     print(f'[REMARK] {storename}: {remark_text}')
                 except Exception as e:
                     print(f'[REMARK] Failed to update remark for {storename}: {e}')
+
+            # ── Update A_Z Status: Last Completed timestamp (cloud only) ──
+            if store_success and not getattr(settings, 'LOCAL', False):
+                try:
+                    if 'A_Z Stataus' in df.columns:
+                        az_col = df.columns.get_loc('A_Z Stataus') + 1
+                        completed_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        store_sheet.update_cell(index + 2, az_col, f"Last Completed: {completed_time}")
+                        print(f'[STATUS] {storename}: A_Z Stataus → Last Completed: {completed_time}')
+                except Exception as e:
+                    print(f'[STATUS] Failed to update A_Z Stataus for {storename}: {e}')
 
     except Exception as e:
         print(f'Fatal Error: {e}')
