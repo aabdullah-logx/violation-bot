@@ -432,49 +432,17 @@ def insert_into_quickbase_x(data_list, violations_list=None):
 
     # ── Violations ──────────────────────────────────────────────
     if violations_list:
-        # ── Duplicate check: query QuickBase for existing storename+ASIN ──
-        new_violations = []
-        skipped_count = 0
-        for v in violations_list:
-            v_store = v.get('storename', '')
-            v_asin  = v.get('asin', '')
-            if v_store and v_asin:
-                try:
-                    query_body = {
-                        "from": "buab36fis",
-                        "select": [3],
-                        "where": f"{{'7'.EX.'{v_store}'}}AND{{'8'.EX.'{v_asin}'}}"
-                    }
-                    qr = requests.post(
-                        "https://api.quickbase.com/v1/records/query",
-                        headers=headers, json=query_body
-                    )
-                    existing = qr.json().get('data', [])
-                    if existing:
-                        print(f"  [QB] Skipping existing violation: {v_store} / {v_asin}")
-                        skipped_count += 1
-                        continue
-                except Exception as e:
-                    print(f"  [QB] Duplicate-check failed for {v_asin}, will insert anyway: {e}")
-            new_violations.append(v)
-
-        print(f"  [QB] Violations: {len(new_violations)} new, {skipped_count} skipped (already exist)")
-
-        if not new_violations:
-            print("  [QB] No new violations to insert.")
-            return
-
         prepared = []
-        for v in new_violations:
+        for v in violations_list:
             date_value = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
 
             # Format S.C Date for QuickBase
             sc_date = ''
-            if v.get('publish_time'):
-                try:
-                    sc_date = v['publish_time'].strftime('%Y-%m-%dT%H:%M:%SZ')
-                except Exception:
-                    sc_date = str(v['publish_time'])
+            publish_time = v.get('publish_time')
+            if publish_time and isinstance(publish_time, datetime):
+                sc_date = publish_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+            elif publish_time:
+                sc_date = str(publish_time)
 
             prepared.append({
                 '6':  {'value': date_value},                   # Update Date
@@ -903,21 +871,16 @@ def get_violations(driver, store, start_date, today=False):
                         // If still no ASIN, skip
                         if (!asin) { skipped++; continue; }
 
-                        // Extract Date — prefer the specific data-testid element
+                        // Extract Date using regex on text content
                         var dateStr = '';
-                        var dateEl = card.querySelector('div[data-testid^="ahd-ppc-row-date-"]');
-                        if (dateEl && dateEl.textContent.trim()) {
-                            dateStr = dateEl.textContent.trim();
-                        }
-                        // Fallback: regex on text content
-                        if (!dateStr) {
-                            var dateMatch = cardText.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},\s+20\d{2}/i);
-                            if (dateMatch) {
-                                dateStr = dateMatch[0].trim();
-                            } else {
-                                var dateMatch2 = cardText.match(/\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+20\d{2}/i);
-                                if (dateMatch2) dateStr = dateMatch2[0].trim();
-                            }
+                        // Usually like "Apr 3, 2026" or "Apr. 3, 2026"
+                        var dateMatch = cardText.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},\s+20\d{2}/i);
+                        if (dateMatch) {
+                            dateStr = dateMatch[0].trim();
+                        } else {
+                            // Try DD MMM YYYY
+                            var dateMatch2 = cardText.match(/\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+20\d{2}/i);
+                            if (dateMatch2) dateStr = dateMatch2[0].trim();
                         }
 
                         // Extract Reason, Action Taken, Health Impact
@@ -1102,6 +1065,7 @@ def get_violations(driver, store, start_date, today=False):
                 break
 
             # ── Process each extracted card ───────────────────────────────
+            page_violations = []
             for card_data in cards_data:
                 asin         = card_data.get('asin', '')
                 date_str     = card_data.get('date', '')
@@ -1113,8 +1077,8 @@ def get_violations(driver, store, start_date, today=False):
 
                 if not publish_time_dt:
                     print(f"  Could not parse date: '{date_str}' for ASIN {asin}")
-                print(f"  {asin} {date_str} {action_taken} {health_impact} {reason}")
-                violations.append({
+                print(f"  {asin} {date_str} {action_taken} {health_impact} {reason} {publish_time_dt}")
+                page_violations.append({
                     "storename":    store.get('profile_name', store.get('storename', '')),
                     "asin":         asin,
                     "impact":       health_impact,
@@ -1123,6 +1087,15 @@ def get_violations(driver, store, start_date, today=False):
                     "publish_time": publish_time_dt,
                     "category":     category
                 })
+
+            # ── Save violations for this page immediately ─────────────────
+            if page_violations:
+                print(f"  >>> Inserting {len(page_violations)} violations from page {current_page} of {category}")
+                if getattr(settings, 'LOCAL_DB', False):
+                    local_db.insert_violations(page_violations)
+                else:
+                    insert_into_quickbase_x(data_list=[], violations_list=page_violations)
+                violations.extend(page_violations)
 
             # ── Pagination: click next page via JavaScript ────────────────
             has_next = driver.execute_script("""
@@ -1152,16 +1125,11 @@ def get_violations(driver, store, start_date, today=False):
             print(f"  Navigating to page {current_page}...")
             time.sleep(5)
 
-        # ── Save violations for this category ─────────────────────────────
+        # ── Summary for this category ─────────────────────────────────────
         if violations:
-            # print(f"  >>> Inserting {len(violations)} violations for {category}")
-            if getattr(settings, 'LOCAL_DB', False):
-                local_db.insert_violations(violations)
-            else:
-                # db.insert_violations(violations)
-                insert_into_quickbase_x(data_list=[], violations_list=violations) 
+            print(f"  Total {len(violations)} violations stored for {category}")
         else:
-            print(f"  No violations to insert for {category}")
+            print(f"  No violations found for {category}")
 
     return driver
 
