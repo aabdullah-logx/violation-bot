@@ -486,7 +486,7 @@ def insert_into_quickbase_x(data_list, violations_list=None):
                 '11': {'value': v.get('reason', '')},          # Sub_Reason
                 '12': {'value': ''},                           # Product Category
                 '13': {'value': v.get('impact', '')},          # Health Impact
-                '14': {'value': sc_date},                      # S.C Date
+                '14': {'value': publish_time},                      # S.C Date
             })
         try:
             r = requests.post(url, headers=headers, json={
