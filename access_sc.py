@@ -432,8 +432,39 @@ def insert_into_quickbase_x(data_list, violations_list=None):
 
     # ── Violations ──────────────────────────────────────────────
     if violations_list:
-        prepared = []
+        # ── Duplicate check: skip violations whose ASIN already exists ──
+        new_violations = []
+        skipped_count = 0
         for v in violations_list:
+            v_asin = v.get('asin', '')
+            if v_asin:
+                try:
+                    query_body = {
+                        "from": "buab36fis",
+                        "select": [3],
+                        "where": f"{{'8'.EX.'{v_asin}'}}"
+                    }
+                    qr = requests.post(
+                        "https://api.quickbase.com/v1/records/query",
+                        headers=headers, json=query_body
+                    )
+                    existing = qr.json().get('data', [])
+                    if existing:
+                        print(f"  [QB] Skipping existing ASIN: {v_asin}")
+                        skipped_count += 1
+                        continue
+                except Exception as e:
+                    print(f"  [QB] Duplicate-check failed for {v_asin}, will insert anyway: {e}")
+            new_violations.append(v)
+
+        print(f"  [QB] Violations: {len(new_violations)} new, {skipped_count} skipped (already exist)")
+
+        if not new_violations:
+            print("  [QB] No new violations to insert.")
+            return
+
+        prepared = []
+        for v in new_violations:
             date_value = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
 
             # Format S.C Date for QuickBase
@@ -443,7 +474,9 @@ def insert_into_quickbase_x(data_list, violations_list=None):
                 sc_date = publish_time.strftime('%Y-%m-%dT%H:%M:%SZ')
             elif publish_time:
                 sc_date = str(publish_time)
-            print("sc_date: ", sc_date)
+
+            print(f"  [QB] ASIN: {v.get('asin', '')} | S.C Date: {sc_date} | publish_time raw: {publish_time}")
+
             prepared.append({
                 '6':  {'value': date_value},                   # Update Date
                 '7':  {'value': v.get('storename', '')},       # Store
@@ -741,15 +774,27 @@ def get_violations(driver, store, start_date, today=False):
     if store['Collections'] != 'Violation + Health Metrics':
         return driver
 
-    # Date format used in the new UI: "Apr. 3, 2026" or "Feb. 28, 2026"
-    date_formats = ["%b. %d, %Y", "%b %d, %Y"]
+    # Date format used in the new UI: "Apr. 3, 2026" or "Feb. 28, 2026" or "Apr 3, 2026"
+    date_formats = ["%b. %d, %Y", "%b %d, %Y", "%B %d, %Y", "%B. %d, %Y",
+                    "%b. %d %Y", "%b %d %Y", "%m/%d/%Y", "%Y-%m-%d"]
 
     def parse_violation_date(date_str):
+        if not date_str:
+            return None
+        cleaned = date_str.strip()
         for fmt in date_formats:
             try:
-                return datetime.strptime(date_str.strip(), fmt)
+                return datetime.strptime(cleaned, fmt)
             except ValueError:
                 continue
+        # Regex fallback: extract "Mon DD, YYYY" or "Mon. DD, YYYY"
+        m = re.match(r'([A-Za-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})', cleaned)
+        if m:
+            try:
+                return datetime.strptime(f"{m.group(1)} {m.group(2)} {m.group(3)}", "%b %d %Y")
+            except ValueError:
+                pass
+        print(f"  [DATE] Failed to parse: '{date_str}'")
         return None
 
     print("Starting Violation...")
@@ -1084,8 +1129,8 @@ def get_violations(driver, store, start_date, today=False):
                     "impact":       health_impact,
                     "action_taken": action_taken,
                     "reason":       reason,
+                    "category":     category,
                     "publish_time": publish_time_dt,
-                    "category":     category
                 })
 
             # ── Save violations for this page immediately ─────────────────
