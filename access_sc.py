@@ -473,10 +473,9 @@ def insert_into_quickbase_x(data_list, violations_list=None):
             publish_time = v.get('publish_time')
 
             if isinstance(publish_time, datetime):
-                sc_date = publish_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+                sc_date = publish_time.strftime('%Y-%m-%d %H:%M:%S')  # "2025-12-15 00:00:00"
             elif isinstance(publish_time, str) and publish_time:
-                sc_date = publish_time[:19].replace(' ', 'T') + 'Z'  # normalize string format
-
+                sc_date = publish_time[:19]  #  trims to "2025-12-15 00:00:00"
             print(f"  [QB] ASIN: {v.get('asin', '')} | S.C Date: {sc_date} | publish_time raw: {publish_time}")
 
             prepared.append({
