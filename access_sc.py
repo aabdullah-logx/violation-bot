@@ -67,6 +67,13 @@ logging.basicConfig(
 # ── Browser launch ─────────────────────────────────────────────────────────────
 def load_web_driver_with_gologin(profile_id):
     print('*********************************', profile_id)
+    if platform == "win32":
+        try:
+            # Suppress output by redirecting to NUL so it doesn't clutter your terminal
+            os.system("taskkill /F /IM orbita-browser.exe /T > NUL 2>&1")
+        except:
+            pass
+    time.sleep(2)
     gl = GoLogin({
         'token': settings.token,
         'profile_id': profile_id
