@@ -473,9 +473,9 @@ def insert_into_quickbase_x(data_list, violations_list=None):
             publish_time = v.get('publish_time')
 
             if publish_time:
-                # Format to MMDDYYYY because Quickbase evaluates ToDate([S.C Date], "MMDDYYYY")
+                # Format to MM-DD-YYYY because Quickbase evaluates ToDate([S.C Date], "MM-DD-YYYY")
                 if hasattr(publish_time, 'strftime'):
-                    sc_date = publish_time.strftime('%m%d%Y')
+                    sc_date = publish_time.strftime('%m-%d-%Y')
                 else:
                     # If it happens to be string, we can't reliably format it
                     # but we keep it safe.
