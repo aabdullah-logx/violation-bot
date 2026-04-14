@@ -137,8 +137,7 @@ def run():
                 profile_id = store['profile_id']
                 print(f'Processing-----------: {storename}')
                 print(f'Processing----------------- {profile_id}')
-                driver = access_sc.load_web_driver_with_gologin(profile_id)
-                print("Driver loaded successfully")
+                driver = access_sc.load_driver(store, None, df, index)
 
                 if driver:
                     try:

@@ -74,10 +74,31 @@ def load_web_driver_with_gologin(profile_id):
         except:
             pass
     time.sleep(2)
+    import tempfile
+    import shutil
+    import os
+
+    temp_dir = tempfile.gettempdir()
+    profile_temp_path = os.path.join(temp_dir, f"gologin_{profile_id}")
+    if os.path.exists(profile_temp_path):
+        try:
+            shutil.rmtree(profile_temp_path, ignore_errors=True)
+            print("Cleaned corrupted profile temp data.")
+        except Exception as e:
+            print(f"Notice: Could not delete temp profile: {e}")
+
     gl = GoLogin({
         'token': settings.token,
         'profile_id': profile_id
     })
+    
+    # Ensure profile is stopped to kill any zombie Gologin.exe / chrome.exe tied to this profile
+    try:
+        gl.stop()
+        time.sleep(2)
+    except:
+        pass
+
     print('******************here')
 
     # Start GoLogin and capture the debugger address it returns
@@ -106,6 +127,9 @@ def load_web_driver_with_gologin(profile_id):
         options=chrome_options
     )
     print("Driver created successfully")
+    
+    # Attach GoLogin instance so it can be gracefully stopped later
+    driver.gl_instance = gl
 
     driver.set_window_position(0, 0)
     driver.set_window_size(1280, 800)
@@ -121,6 +145,10 @@ def load_web_driver_with_gologin(profile_id):
             driver.switch_to.window(main_window)
     except Exception as e:
         print(f"Could not close extra tabs: {e}")
+        try:
+            _ = driver.current_url
+        except:
+            raise Exception("Browser connection closed immediately after startup")
         
     return driver
 
@@ -146,13 +174,29 @@ def load_driver(store, gc_store, df, index):
 
 
 def quit_driver(driver):
+    if driver is None:
+        return
+        
+    gl_instance = getattr(driver, 'gl_instance', None)
+    
     try:
         for window_handle in driver.window_handles:
             driver.switch_to.window(window_handle)
             driver.close()
     except:
         pass
-    driver.quit()
+        
+    try:
+        driver.quit()
+    except:
+        pass
+        
+    if gl_instance:
+        try:
+            gl_instance.stop()
+            print("GoLogin profile properly stopped.")
+        except:
+            pass
 
 
 # ── Authentication ─────────────────────────────────────────────────────────────
