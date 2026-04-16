@@ -12,6 +12,7 @@ token = os.getenv("TOKEN")
 # Convert string "False" or "True" to actual Boolean types
 LOCAL = os.getenv("LOCAL", "False").lower() == "true"
 LOCAL_DB = os.getenv("LOCAL_DB", "False").lower() == "true"
+REVERSE = os.getenv("REVERSE", "False").lower() == "true"
 
 # --- URL Constants ---
 base_url = os.getenv("BASE_URL", "https://sellercentral.amazon.com")
@@ -29,7 +30,6 @@ def get_full_url(path_key):
     if path:
         return f"{BASE_URL}{path}"
     return None
-
 # Example usage within this file for verification:
 if __name__ == "__main__":
     print(f"Database Mode: {'Local' if LOCAL_DB else 'QuickBase'}")

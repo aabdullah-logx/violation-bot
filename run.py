@@ -67,6 +67,11 @@ def run():
                 print(f'Error fetching stores from Google Sheets: {e}')
                 return None
 
+        # ── Reverse store order if REVERSE=True ───────────────────────────
+        if getattr(settings, 'REVERSE', False):
+            df = df.iloc[::-1]
+            print(f'[REVERSE] Processing stores from last to first ({len(df)} stores)')
+
         # ── Process each store ────────────────────────────────────────────
         for index, store in df.iterrows():
 
@@ -77,7 +82,7 @@ def run():
 
             # Unified column access — CSV uses 'profile_name', Sheets may use 'storename'
             storename = store.get('profile_name') or store.get('storename', 'Unknown')
-            home_url = store.get('Amazon Home Page Link', '')
+            home_url = store.get('Amazon Home Page Link', 'https://sellercentral.amazon.com/home')
 
             print(f'Processing: {storename}')
 

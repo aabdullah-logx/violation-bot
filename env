@@ -1,0 +1,16 @@
+# API & Auth
+TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2NDAxNDE5MGI0OWU0ZTU4ZTBhMjQ0YWMiLCJ0eXBlIjoiZGV2Iiwiand0aWQiOiI2ODgxZDZiYmY3YjM4NzkxNDJjOGJlYTkifQ.0NaNXMhN2GL-E-dt2-Kof_grRlMWZBOPhd6J9da-Qtw"
+
+# URLs
+BASE_URL="https://sellercentral.amazon.com"
+AMAZON_HOME="https://sellercentral.amazon.com/home"
+A_Z_CLAIMS="/gp/guarantee-claims/home.html"
+
+
+# Flags
+LOCAL=False
+LOCAL_DB=False
+REVERSE=True
+
+# Policy Paths (JSON formatted string)
+POLICY_VIOLATION_PATHS='{"suspected_intellectual_property_violations": "/performance/detail/product-policies?t=brand-protection&ref=sp_st_dash_sus_intellectual_prop", "intellectual_property_complaints": "/performance/detail/product-policies?t=intel&ref=sp_st_dash_pp_intellectual", "product_authenticity_complaints": "/performance/detail/product-policies?t=auth&ref=sp_st_dash_pp_auth", "product_condition_customer_complaints":"/performance/detail/product-policies?t=condition&ref=sp_st_dash_pp_condition", "food_and_product_safety_issues":"/performance/detail/product-policies?t=safe&ref=sp_st_dash_pp_safe", "listing_policy_violations":"/performance/detail/product-policies?t=list&ref=sp_st_dash_pp_listing", "restricted_product_policy_violations": "/performance/detail/product-policies?t=restricted&ref=sp_st_dash_rp", "customer_product_reviews_policy_violations": "/performance/detail/product-policies?t=abuse&ref=sp_st_dash_pp_abuse"}'
