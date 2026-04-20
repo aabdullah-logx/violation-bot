@@ -92,12 +92,35 @@ def load_web_driver_with_gologin(profile_id):
         'profile_id': profile_id
     })
     
-    # Ensure profile is stopped to kill any zombie Gologin.exe / chrome.exe tied to this profile
+    # Ensure profile is stopped if already running (API + local process cleanup)
+    # gl.stop() on a fresh instance does nothing because self.pid is 0,
+    # so we hit the GoLogin API directly to close the remote/running profile.
     try:
-        gl.stop()
-        time.sleep(2)
-    except:
-        pass
+        stop_url = f"https://api.gologin.com/browser/{profile_id}/web"
+        stop_headers = {
+            'Authorization': f'Bearer {settings.token}',
+            'User-Agent': 'Selenium-API',
+        }
+        resp = requests.delete(stop_url, headers=stop_headers, params={'isNewCloudBrowser': True})
+        print(f"API stop profile response: {resp.status_code}")
+    except Exception as e:
+        print(f"Notice: Could not stop profile via API (may not be running): {e}")
+
+    # Kill any local orbita-browser processes tied to this profile
+    try:
+        import psutil
+        for proc in psutil.process_iter(['pid', 'cmdline']):
+            try:
+                cmdline = proc.info.get('cmdline') or []
+                if any(profile_id in arg for arg in cmdline):
+                    print(f"Killing local process {proc.pid} for profile {profile_id}")
+                    proc.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+    except Exception as e:
+        print(f"Notice: Could not kill local processes: {e}")
+
+    time.sleep(3)
 
     print('******************here')
 
