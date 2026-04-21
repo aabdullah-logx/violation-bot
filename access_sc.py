@@ -5,14 +5,11 @@ import math
 import re
 import inspect
 import logging
-
 from sys import platform
 from datetime import datetime
-
 import requests
 import pandas as pd
 from Tools.scripts.mkreal import join
-
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -22,7 +19,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 # import beautifulsoup4
 from gologin import GoLogin
-
 import settings
 import get_totp
 import db
@@ -67,60 +63,102 @@ logging.basicConfig(
 # ── Browser launch ─────────────────────────────────────────────────────────────
 def load_web_driver_with_gologin(profile_id):
     print('*********************************', profile_id)
-    if platform == "win32":
-        try:
-            # Suppress output by redirecting to NUL so it doesn't clutter your terminal
-            os.system("taskkill /F /IM orbita-browser.exe /T > NUL 2>&1")
-        except:
-            pass
-    time.sleep(2)
     import tempfile
     import shutil
-    import os
+    import subprocess
 
+    # ── Step 1: Stop the GoLogin profile via API FIRST to release file locks ──
+    try:
+        gl_cleanup = GoLogin({
+            'token': settings.token,
+            'profile_id': profile_id,
+        })
+        gl_cleanup.stop()
+        print(f"Stopped GoLogin profile {profile_id} via API.")
+        time.sleep(3)
+    except Exception as e:
+        print(f"GoLogin API stop (cleanup): {e}")
+
+    # ── Step 2: Kill ALL processes that may hold locks on the profile ──
+    if platform == "win32":
+        import subprocess
+        # Kill any process whose command line contains this profile_id
+        # This catches orbita chrome.exe regardless of executable name
+        try:
+            ps_cmd = (
+                f'Get-WmiObject Win32_Process | '
+                f'Where-Object {{ $_.CommandLine -like "*{profile_id}*" }} | '
+                f'ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}'
+            )
+            subprocess.run(["powershell", "-Command", ps_cmd], timeout=15, capture_output=True)
+            print(f"Killed processes matching profile {profile_id}")
+        except Exception as e:
+            print(f"PowerShell process kill (profile): {e}")
+
+        # Kill chrome.exe instances running from GoLogin's orbita-browser path
+        # (GoLogin browser runs as chrome.exe under .gologin\browser\orbita-browser-*)
+        try:
+            ps_orbita = (
+                'Get-WmiObject Win32_Process -Filter "Name=\'chrome.exe\'" | '
+                'Where-Object { $_.CommandLine -like "*orbita*" -or $_.CommandLine -like "*gologin*" } | '
+                'ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }'
+            )
+            subprocess.run(["powershell", "-Command", ps_orbita], timeout=15, capture_output=True)
+            print("Killed orbita chrome.exe processes")
+        except Exception as e:
+            print(f"PowerShell process kill (orbita): {e}")
+
+        # Kill Gologin desktop app and chromedriver
+        for proc_name in ["Gologin.exe", "chromedriver.exe"]:
+            try:
+                subprocess.run(
+                    f"taskkill /F /IM {proc_name} /T",
+                    shell=True, timeout=10, capture_output=True
+                )
+            except:
+                pass
+
+        # Wait for processes to fully terminate and release file handles
+        time.sleep(5)
+
+    # ── Step 3: Force-delete the temp profile folder with retries ──
+    import tempfile
+    import shutil
     temp_dir = tempfile.gettempdir()
     profile_temp_path = os.path.join(temp_dir, f"gologin_{profile_id}")
     if os.path.exists(profile_temp_path):
-        try:
-            shutil.rmtree(profile_temp_path, ignore_errors=True)
-            print("Cleaned corrupted profile temp data.")
-        except Exception as e:
-            print(f"Notice: Could not delete temp profile: {e}")
+        for attempt in range(5):
+            try:
+                shutil.rmtree(profile_temp_path)
+                print("Cleaned profile temp data.")
+                break
+            except (PermissionError, OSError) as e:
+                print(f"Temp folder locked (attempt {attempt + 1}/5): {e}")
+                if platform == "win32":
+                    # Try to find and kill whatever is locking files in the folder
+                    try:
+                        ps_lock = (
+                            f'Get-Process | Where-Object {{ $_.Path -like "*orbita*" -or $_.Path -like "*gologin*" }} | '
+                            f'Stop-Process -Force -ErrorAction SilentlyContinue'
+                        )
+                        subprocess.run(["powershell", "-Command", ps_lock], timeout=10, capture_output=True)
+                    except:
+                        pass
+                time.sleep(3)
+                # On last attempt, try force-delete via OS command
+                if attempt == 4 and platform == "win32":
+                    os.system(f'rmdir /s /q "{profile_temp_path}" > NUL 2>&1')
+                    time.sleep(2)
+            except Exception as e:
+                print(f"Notice: Could not delete temp profile: {e}")
+                break
 
+    # ── Step 4: Create fresh GoLogin instance and start ──
     gl = GoLogin({
         'token': settings.token,
-        'profile_id': profile_id
+        'profile_id': profile_id,
+        'extra_params': ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
     })
-    
-    # Ensure profile is stopped if already running (API + local process cleanup)
-    # gl.stop() on a fresh instance does nothing because self.pid is 0,
-    # so we hit the GoLogin API directly to close the remote/running profile.
-    try:
-        stop_url = f"https://api.gologin.com/browser/{profile_id}/web"
-        stop_headers = {
-            'Authorization': f'Bearer {settings.token}',
-            'User-Agent': 'Selenium-API',
-        }
-        resp = requests.delete(stop_url, headers=stop_headers, params={'isNewCloudBrowser': True})
-        print(f"API stop profile response: {resp.status_code}")
-    except Exception as e:
-        print(f"Notice: Could not stop profile via API (may not be running): {e}")
-
-    # Kill any local orbita-browser processes tied to this profile
-    try:
-        import psutil
-        for proc in psutil.process_iter(['pid', 'cmdline']):
-            try:
-                cmdline = proc.info.get('cmdline') or []
-                if any(profile_id in arg for arg in cmdline):
-                    print(f"Killing local process {proc.pid} for profile {profile_id}")
-                    proc.kill()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
-    except Exception as e:
-        print(f"Notice: Could not kill local processes: {e}")
-
-    time.sleep(3)
 
     print('******************here')
 
@@ -150,13 +188,17 @@ def load_web_driver_with_gologin(profile_id):
         options=chrome_options
     )
     print("Driver created successfully")
-    
+    time.sleep(15)
     # Attach GoLogin instance so it can be gracefully stopped later
     driver.gl_instance = gl
+    print('started..........')
 
-    driver.set_window_position(0, 0)
-    driver.set_window_size(1280, 800)
-    driver.maximize_window()
+    try:
+        driver.set_window_position(0, 0)
+        driver.set_window_size(1280, 800)
+        driver.maximize_window()
+    except:
+        pass
     # Close any extra windows to maintain only one active tab
     try:
         handles = driver.window_handles
@@ -415,6 +457,127 @@ def check_switch_account(driver, profile):
         pass
 
 
+def check_full_page_account_switcher(driver):
+    """
+    If Amazon shows the full page 'Select an account' after login,
+    select Canada and click 'Select account'.
+    Handles two scenarios:
+      1. Canada is directly visible as a top-level account option.
+      2. Canada is nested under a parent dropdown (e.g. BYJ-US) that
+         must be expanded first.
+    """
+    try:
+        time.sleep(3)
+        h1 = driver.find_elements(By.XPATH, '//h1[normalize-space(text())="Select an account"]')
+        if not h1:
+            return
+        print("Full page account switcher detected. Selecting Canada...")
+
+        canada_found = False
+
+        # ── Attempt 1: Canada is directly visible as a top-level option ──
+        try:
+            canada_btn = driver.find_element(
+                By.XPATH,
+                "//button[.//span[contains(@class, 'full-page-account-switcher-account-label') and normalize-space(text())='Canada']]"
+            )
+            print("Canada found directly. Clicking...")
+            driver.execute_script("arguments[0].click();", canada_btn)
+            canada_found = True
+        except NoSuchElementException:
+            print("Canada not found directly. Checking parent dropdowns...")
+
+        # ── Attempt 2: Expand parent account dropdowns to reveal Canada ──
+        if not canada_found:
+            # Find all top-level account dropdown buttons (e.g. BYJ-US, BYJ-EU)
+            account_btns = driver.find_elements(
+                By.CSS_SELECTOR,
+                "div.full-page-account-switcher-account button.full-page-account-switcher-account-details"
+            )
+            print(f"Found {len(account_btns)} parent account dropdown(s)")
+
+            for btn in account_btns:
+                try:
+                    label_el = btn.find_element(
+                        By.CSS_SELECTOR,
+                        "span.full-page-account-switcher-account-label"
+                    )
+                    label_text = label_el.text.strip()
+                    print(f"  Expanding dropdown: {label_text}")
+                except:
+                    label_text = "(unknown)"
+
+                driver.execute_script("arguments[0].click();", btn)
+                time.sleep(2)
+
+                # After expanding, look for Canada inside the revealed sub-items
+                try:
+                    canada_btn = WebDriverWait(driver, 5).until(
+                        EC.presence_of_element_located((
+                            By.XPATH,
+                            "//button[.//span[contains(@class, 'full-page-account-switcher-account-label') and normalize-space(text())='Canada']]"
+                        ))
+                    )
+                    print(f"  Canada found under '{label_text}'. Clicking...")
+                    driver.execute_script("arguments[0].click();", canada_btn)
+                    canada_found = True
+                    break
+                except (NoSuchElementException, TimeoutException):
+                    print(f"  Canada not under '{label_text}', trying next...")
+                    # Collapse this dropdown before trying the next
+                    try:
+                        driver.execute_script("arguments[0].click();", btn)
+                        time.sleep(1)
+                    except:
+                        pass
+
+        if not canada_found:
+            print("WARNING: Could not find Canada in any dropdown!")
+            return
+
+        time.sleep(3)
+
+        # ── Click "Select account" button ──
+        select_btn = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((
+                By.XPATH,
+                "//kat-button[@data-test='confirm-selection' or @label='Select account']"
+            ))
+        )
+        driver.execute_script("arguments[0].click();", select_btn)
+        print("Clicked 'Select account'. Waiting for page to load...")
+        time.sleep(10)
+
+    except Exception as e:
+        print(f"Error in full page account switcher: {e}")
+
+
+def check_pre_signin_account_switcher(driver):
+    """
+    If Amazon shows the 'Switch accounts' page BEFORE the sign-in page,
+    click the first listed account to proceed, then wait for the sign-in
+    page to load so email/password can be entered.
+    """
+    try:
+        switch_header = driver.find_elements(By.XPATH, '//h1[normalize-space(text())="Switch accounts"]')
+        if switch_header:
+            print("Pre-sign-in 'Switch accounts' page detected. Clicking first account...")
+            # Click the first account button (not the 'Add account' link)
+            first_account_btn = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((
+                    By.CSS_SELECTOR,
+                    'a.cvf-widget-btn-verify-account-switcher'
+                ))
+            )
+            first_account_btn.click()
+            print("Clicked first account. Waiting 3 seconds...")
+            time.sleep(3)
+            return True
+    except Exception as e:
+        print(f"No pre-sign-in account switcher or error: {e}")
+    return False
+
+
 def signin(store, driver, gc_store, df, index):
     """
     Main entry point for authentication.
@@ -437,6 +600,13 @@ def signin(store, driver, gc_store, df, index):
             time.sleep(1)
 
         except TimeoutException:
+            # Check if the "Switch accounts" page appears before sign-in
+            if check_pre_signin_account_switcher(driver):
+                print("Account selected from switcher, proceeding to sign-in...")
+                # After clicking the account, the sign-in page should load
+                # Fall through to the sign-in flow below
+                break
+
             try:
                 wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1.a-spacing-small")))
                 print("Sign in page detected.")
@@ -455,6 +625,7 @@ def signin(store, driver, gc_store, df, index):
         sign_in_ok = sign_in_if_needed(driver, store, gc_store, df, index)
         if sign_in_ok:
             check_switch_account(driver, store)
+            check_full_page_account_switcher(driver)
         else:
             quit_driver(driver)
             return None
@@ -711,14 +882,23 @@ def get_violations(driver, store, start_date, today=False):
     time.sleep(6)
 
     try:
+        # Check for "Switch accounts" page before sign-in
+        if driver.find_elements(By.XPATH, '//h1[normalize-space(text())="Switch accounts"]'):
+            print("Switch accounts page detected on health page. Clicking first account...")
+            check_pre_signin_account_switcher(driver)
+
         if driver.find_elements(By.XPATH, '//h1[contains(text(), "Sign in")]') or driver.find_elements(By.CSS_SELECTOR, "h1.a-spacing-small"):
             if "Sign in" in driver.page_source:
                 print("Sign in required on health page. Re-authenticating...")
-                sign_in_if_needed(driver, store, None,  None)
+                sign_in_if_needed(driver, store, None, None, None)
                 check_switch_account(driver, store)
+                check_full_page_account_switcher(driver)
                 time.sleep(5)
+                # Re-navigate to the health dashboard after sign in
+                driver.get(health_url)
+                time.sleep(6)
     except Exception as e:
-        pass
+        print(f"Error during sign-in on health page: {e}")
 
     try:
         WebDriverWait(driver, 5).until(
@@ -891,11 +1071,15 @@ def get_violations(driver, store, start_date, today=False):
             if driver.find_elements(By.XPATH, '//h1[contains(text(), "Sign in")]') or driver.find_elements(By.CSS_SELECTOR, "h1.a-spacing-small"):
                 if "Sign in" in driver.page_source:
                     print("Sign in required on violation page. Re-authenticating...")
-                    sign_in_if_needed(driver, store, None, None)
+                    sign_in_if_needed(driver, store, None, None, None)
                     check_switch_account(driver, store)
+                    check_full_page_account_switcher(driver)
                     time.sleep(5)
+                    # Re-navigate to the violation URL after sign in
+                    driver.get(violation_url)
+                    time.sleep(8)
         except Exception as e:
-            pass
+            print(f"Error during sign-in on violation page: {e}")
 
         violations = []
         skip_category = False
